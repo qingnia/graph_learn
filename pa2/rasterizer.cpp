@@ -129,6 +129,7 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
         if (ymax < t.v[i][1])
             ymax = t.v[i][1];
     }
+
     std::cout << " xmax: " << xmax << "\n ymax: " << ymax << std::endl;
     // iterate through the pixel and find if the current pixel is inside the triangle
     Eigen::Vector3f pos(1.0f,2.0f,0.0f);
@@ -147,7 +148,11 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
                 // (use getColor function) if it should be painted.
                 pos[0] = x;
                 pos[1] = y;
-                this->set_pixel(pos, t.getColor());
+                if (depth_buf[get_index(x, y)] > z_interpolated)    
+                {
+                    depth_buf[get_index(x, y)] = z_interpolated;
+                    this->set_pixel(pos, t.getColor());
+                }
             }
         }
     }
