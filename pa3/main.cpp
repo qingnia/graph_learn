@@ -127,6 +127,13 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
     return result_color * 255.f;
 }
 
+static void cheng(const Eigen::Vector3f& vert1, const Eigen::Vector3f& vert2, Eigen::Vector3f& ret)
+{
+    ret[0] = vert1[0] * vert2[0];
+    ret[1] = vert1[1] * vert2[1];
+    ret[3] = vert1[2] * vert2[2];
+}
+
 Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
 {
     Eigen::Vector3f ka = Eigen::Vector3f(0.005, 0.005, 0.005);
@@ -147,11 +154,26 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
     Eigen::Vector3f normal = payload.normal;
 
     Eigen::Vector3f result_color = {0, 0, 0};
+
+    Eigen::Vector3f v, l, h, ambient, diffuse, specular;
+
+    cheng(ka, amb_light_intensity, ambient);
+    float r2, cosnl, cosnh;
     for (auto& light : lights)
     {
         // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
         // components are. Then, accumulate that result on the *result_color* object.
-        
+        r2 = std::pow((eye_pos[0]-point[0]), 2) + std::pow((eye_pos[1]-point[1]), 2) + std::pow((eye_pos[2]-point[2]), 2);
+        l = light.position - point;
+
+        cosnl = MAX(0, normal.dot(l));
+        cheng(kd, (light.intensity / r2), diffuse);
+
+        v = eye_pos - point;
+        h = (v + l).normalized();
+        cosnh = MAX(0, normal.dot(h));
+
+        result_color = result_color + ambient + diffuse * cosnl + specular * cosnh;
     }
 
     return result_color * 255.f;
