@@ -127,11 +127,9 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
     return result_color * 255.f;
 }
 
-static void cheng(const Eigen::Vector3f& vert1, const Eigen::Vector3f& vert2, Eigen::Vector3f& ret)
+static Eigen::Vector3f cheng(const Eigen::Vector3f& vert1, const Eigen::Vector3f& vert2)
 {
-    ret[0] = vert1[0] * vert2[0];
-    ret[1] = vert1[1] * vert2[1];
-    ret[3] = vert1[2] * vert2[2];
+    return Eigen::Vector3f(vert1[0] * vert2[0], vert1[1] * vert2[1], vert1[2] * vert2[2]);
 }
 
 Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
@@ -157,23 +155,27 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
 
     Eigen::Vector3f v, l, h, ambient, diffuse, specular;
 
-    cheng(ka, amb_light_intensity, ambient);
+    ambient = cheng(ka, amb_light_intensity);
+    result_color = result_color + ambient;
     float r2, cosnl, cosnh;
+    r2 = std::pow((eye_pos[0]-point[0]), 2) + std::pow((eye_pos[1]-point[1]), 2) + std::pow((eye_pos[2]-point[2]), 2);
     for (auto& light : lights)
     {
         // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
         // components are. Then, accumulate that result on the *result_color* object.
-        r2 = std::pow((eye_pos[0]-point[0]), 2) + std::pow((eye_pos[1]-point[1]), 2) + std::pow((eye_pos[2]-point[2]), 2);
-        l = light.position - point;
+        l = (light.position - point).normalized();
 
-        cosnl = MAX(0, normal.dot(l));
-        cheng(kd, (light.intensity / r2), diffuse);
+        cosnl = std::max(0.0f, normal.dot(l));
+        diffuse = cheng(kd, (light.intensity / r2));
+        //std::cout << "diffuse" << diffuse << std::endl;
 
-        v = eye_pos - point;
+        v = (eye_pos - point).normalized();
         h = (v + l).normalized();
-        cosnh = MAX(0, normal.dot(h));
+        cosnh = std::max(0.0f, std::pow(normal.dot(h), p));
+        specular = cheng(ks, (light.intensity / r2));
+        //std::cout << "specular" << specular << std::endl;
 
-        result_color = result_color + ambient + diffuse * cosnl + specular * cosnh;
+        result_color = result_color + diffuse * cosnl + specular * cosnh;
     }
 
     return result_color * 255.f;
