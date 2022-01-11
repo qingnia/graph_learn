@@ -52,10 +52,10 @@ Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float z
     // Students will implement this function
 
     Eigen::Matrix4f projection = Eigen::Matrix4f::Identity();
-    float t = std::tan(eye_fov/2) * zNear * -1;
+    float t = std::tan(eye_fov/2 * MY_PI / 180.f) * zNear * -1;
     float r = aspect_ratio * t;
     Eigen::Matrix4f o, p2o;
-    o << 1/r, 0, 0, 0, 0, 1/t, 0, 0, 0, 0, 2/(zNear-zFar), 0, 0, 0, 0, 1;
+    o << 1/r, 0, 0, -r, 0, 1/t, 0, -t, 0, 0, 2/(zNear-zFar), -(zNear+zFar)/2, 0, 0, 0, 1;
     p2o << zNear, 0, 0, 0, 0, zNear, 0, 0, 0, 0, zNear+zFar, -zNear*zFar, 0, 0, 1, 0;
     projection = o * p2o;
 
@@ -152,30 +152,53 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
     Eigen::Vector3f normal = payload.normal;
 
     Eigen::Vector3f result_color = {0, 0, 0};
-
-    Eigen::Vector3f v, l, h, ambient, diffuse, specular;
-
-    ambient = cheng(ka, amb_light_intensity);
-    result_color = result_color + ambient;
-    float r2, cosnl, cosnh;
-    r2 = std::pow((eye_pos[0]-point[0]), 2) + std::pow((eye_pos[1]-point[1]), 2) + std::pow((eye_pos[2]-point[2]), 2);
+    /*
     for (auto& light : lights)
     {
+        Eigen::Vector3f I = light.intensity;
+        Eigen::Vector3f l = light.position - point;
+
+        float distance = (light.position.x()-point.x())*(light.position.x()-point.x()) +
+                         (light.position.y()-point.y())*(light.position.y()-point.y()) +
+                         (light.position.z()-point.z())*(light.position.z()-point.z());
+        Eigen::Vector3f consum = I / distance;
+        l.normalize();
+        Eigen::Vector3f n = normal.normalized();
+
+        Eigen::Vector3f ld = kd.cwiseProduct(consum) * MAX(0, l.dot(n));
+
+        Eigen::Vector3f v = (eye_pos - point).normalized();
+        auto vPlusl = v + l;
+        Eigen::Vector3f h = vPlusl.normalized();
+        Eigen::Vector3f ls = ks.cwiseProduct(consum) * pow(MAX(0, n.dot(h)), p);
+
+        Eigen::Vector3f la = ka.cwiseProduct(amb_light_intensity);
+        result_color += (la + ld + ls);
+    }*/
+
+
+    for (auto& light : lights)
+    {
+        Eigen::Vector3f v, l, h, n, ambient, diffuse, specular;
+        ambient = ka.cwiseProduct(amb_light_intensity);
+        float r2, cosnl, cosnh;
+        result_color = result_color + ambient;
+        r2 = pow((light.position[0]-point[0]), 2) + pow((light.position[1]-point[1]), 2) + pow((light.position[2]-point[2]), 2);
         // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
         // components are. Then, accumulate that result on the *result_color* object.
-        l = (light.position - point).normalized();
+        l = (light.position - point);
+        l.normalize();
+        n = normal.normalized();
 
-        cosnl = std::max(0.0f, normal.dot(l));
-        diffuse = cheng(kd, (light.intensity / r2));
-        //std::cout << "diffuse" << diffuse << std::endl;
+        cosnl = MAX(0.0f, l.dot(n));
+        diffuse = kd.cwiseProduct(light.intensity / r2);
+        result_color = result_color + diffuse * cosnl;
 
         v = (eye_pos - point).normalized();
         h = (v + l).normalized();
-        cosnh = std::max(0.0f, std::pow(normal.dot(h), p));
-        specular = cheng(ks, (light.intensity / r2));
-        //std::cout << "specular" << specular << std::endl;
-
-        result_color = result_color + diffuse * cosnl + specular * cosnh;
+        cosnh = pow(std::max(0.0f, normal.dot(h)), p);
+        specular = ks.cwiseProduct(light.intensity / r2);
+        result_color = result_color + specular * cosnh;
     }
 
     return result_color * 255.f;

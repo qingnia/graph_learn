@@ -260,25 +260,18 @@ static Eigen::Vector2f interpolate(float alpha, float beta, float gamma, const E
 void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eigen::Vector3f, 3>& view_pos) 
 {
     auto v = t.toVector4();
-
-    // Find out the bounding box of current triangle.
-    float xmax = 0;
-    float ymax = 0;
-    for (size_t i = 0; i < 3; i++)
-    {
-        if (xmax < t.v[i][0])
-            xmax = t.v[i][0];
-        if (ymax < t.v[i][1])
-            ymax = t.v[i][1];
-    }
+    int xmin = std::floor(std::min(std::min(v[0][0], v[1][0]), v[2][0]));
+    int xmax = std::ceil(std::max(std::max(v[0][0], v[1][0]), v[2][0]));
+    int ymin = std::floor(std::min(std::min(v[0][1], v[1][1]), v[2][1]));
+    int ymax = std::ceil(std::max(std::max(v[0][1], v[1][1]), v[2][1]));
 
     //std::cout << " xmax: " << xmax << "\n ymax: " << ymax << std::endl;
     // iterate through the pixel and find if the current pixel is inside the triangle
     Eigen::Vector3f interpolated_color, interpolated_normal, interpolated_shadingcoords;
     Eigen::Vector2f interpolated_texcoords;
-    for (size_t x = 0; x < xmax; x++)
+    for (size_t x = xmin; x < xmax; x++)
     {
-        for (size_t y = 0; y < ymax; y++)
+        for (size_t y = ymin; y < ymax; y++)
         {
             if(insideTriangle(x, y, t.v))
             {
@@ -293,11 +286,10 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
                 // (use getColor function) if it should be painted.
                 if (depth_buf[get_index(x, y)] > zp)    
                 {
-                    interpolated_color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], -zp);
-                    interpolated_normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], -zp);
-                    interpolated_texcoords = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], -zp);
-                    interpolated_shadingcoords[0] = x;
-                    interpolated_shadingcoords[1] = y;
+                    interpolated_color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1);
+                    interpolated_normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1);
+                    interpolated_texcoords = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1);
+                    interpolated_shadingcoords = interpolate(alpha, beta, gamma, view_pos[0], view_pos[1], view_pos[2], 1);
 
                     fragment_shader_payload payload( interpolated_color, interpolated_normal.normalized(), interpolated_texcoords, texture ? &*texture : nullptr);
                     payload.view_pos = interpolated_shadingcoords;
