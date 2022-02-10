@@ -93,7 +93,7 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
     if (payload.texture)
     {
         // TODO: Get the texture value at the texture coordinates of the current fragment
-
+        return_color = payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y());
     }
     Eigen::Vector3f texture_color;
     texture_color << return_color.x(), return_color.y(), return_color.z();
@@ -119,9 +119,26 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
 
     for (auto& light : lights)
     {
+        Eigen::Vector3f v, l, h, n, ambient, diffuse, specular;
+        ambient = ka.cwiseProduct(amb_light_intensity);
+        float r2, cosnl, cosnh;
+        result_color = result_color + ambient;
+        r2 = pow((light.position[0]-point[0]), 2) + pow((light.position[1]-point[1]), 2) + pow((light.position[2]-point[2]), 2);
         // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
         // components are. Then, accumulate that result on the *result_color* object.
+        l = (light.position - point);
+        l.normalize();
+        n = normal.normalized();
 
+        cosnl = MAX(0.0f, l.dot(n));
+        diffuse = kd.cwiseProduct(light.intensity / r2);
+        result_color = result_color + diffuse * cosnl;
+
+        v = (eye_pos - point).normalized();
+        h = (v + l).normalized();
+        cosnh = pow(std::max(0.0f, normal.dot(h)), p);
+        specular = ks.cwiseProduct(light.intensity / r2);
+        result_color = result_color + specular * cosnh;
     }
 
     return result_color * 255.f;
@@ -276,6 +293,34 @@ Eigen::Vector3f bump_fragment_shader(const fragment_shader_payload& payload)
 
 
     float kh = 0.2, kn = 0.1;
+
+    float x = normal.x();
+    float y = normal.y();
+    float z = normal.z();
+    Eigen::Vector3f n = normal.normalized();
+    Eigen::Vector3f t;
+    if (x > y)
+        t = Eigen::Vector3f(-z, 0, x) / std::sqrt(x*x + z*z);
+    else
+        t = Eigen::Vector3f(0, -z, y) / std::sqrt(y*y + z*z);
+    //Eigen::Vector3f t(x*y/std::sqrt(x*x+z*z), std::sqrt(x*x+z*z), z*y/std::sqrt(x*x+z*z));
+    Eigen::Vector3f b = n.cross(t);
+    Eigen::Matrix3f TBN;
+    TBN.col(0) = t;
+    TBN.col(1) = b;
+    TBN.col(2) = n;
+
+    float u = payload.tex_coords[0];
+    float v = payload.tex_coords[1];
+    float w = payload.texture->width;
+    float h = payload.texture->height;
+    float dU = kh * kn * (payload.texture->getColor(u+1.0/w, v).norm() - payload.texture->getColor(u,v).norm());
+    std::cout << "kh:" << kh << ", kn:" << kn << ", u:" << u << ", v:" << v << ", h:" << h << std::endl;
+    float dV = kh * kn * (payload.texture->getColor(u, v+1.0/h).norm() - payload.texture->getColor(u,v).norm());
+    Eigen::Vector3f ln{-1*dU, -1*dV, 1.0};
+    point = point + kn * n * payload.texture->getColor(u, v).norm();
+
+    normal = (TBN * ln.normalized()).normalized();
 
     // TODO: Implement bump mapping here
     // Let n = normal = (x, y, z)
